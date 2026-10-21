@@ -1,4 +1,4 @@
-"""Receiver coverage eta(s) and region coverage kappa (Sec. 3). No model and no GPU needed.
+"""Receiver coverage eta(s) and region coverage kappa. No model and no GPU needed.
 
 * eta(s): share of small objects (COCO small, area < 32^2 original px) whose box, mapped into the
   letterboxed input, contains at least one receiving position of a level with stride s -- the cell

@@ -1,7 +1,5 @@
 # LiteGTR
 
-This code has been checked for anonymity, both manually and with an AI assistant.
-
 ## Usage
 
 ### Installation
@@ -57,7 +55,7 @@ python tools/latency.py --config configs/litegtr.yaml
 
 Latency: PyTorch FP16, batch 1, 640 x 640, forward pass to decoded boxes (no NMS), median of 300 runs.
 
-### Receiver coverage and region coverage (Sec. 3)
+### Receiver coverage and region coverage
 
 ```bash
 python tools/receiver_coverage.py --data-root data/VisDrone
@@ -85,7 +83,3 @@ python tools/train.py --config configs/litegtr.yaml --data-root data/VisDrone --
 ```
 
 Outputs go to `runs/train/<name>/`. Resume with `--resume runs/train/<name>/weights/last.pt`.
-
----
-
-Thank you for reading. The code will be open-sourced upon acceptance.
