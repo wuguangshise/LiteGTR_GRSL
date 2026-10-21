@@ -86,4 +86,14 @@ Outputs go to `runs/train/<name>/`. Resume with `--resume runs/train/<name>/weig
 
 ## Acknowledgments
 
+**中文**
+
+感谢您抽出时间阅读我们的论文并了解 LiteGTR。衷心感谢您对这项工作的关注，欢迎提出宝贵的反馈与建议。
+
+**English**
+
 Thank you for taking the time to read our paper and explore LiteGTR. We sincerely appreciate your interest in our work and welcome your feedback and suggestions.
+
+**Español**
+
+Gracias por dedicar su tiempo a leer nuestro artículo y conocer LiteGTR. Agradecemos sinceramente su interés en nuestro trabajo y recibimos con gusto sus comentarios y sugerencias.
