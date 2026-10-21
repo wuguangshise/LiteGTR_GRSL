@@ -83,3 +83,7 @@ python tools/train.py --config configs/litegtr.yaml --data-root data/VisDrone --
 ```
 
 Outputs go to `runs/train/<name>/`. Resume with `--resume runs/train/<name>/weights/last.pt`.
+
+## Acknowledgments
+
+Thank you for taking the time to read our paper and explore LiteGTR. We sincerely appreciate your interest in our work and welcome your feedback and suggestions.
