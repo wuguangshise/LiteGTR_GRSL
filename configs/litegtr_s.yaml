@@ -1,0 +1,10 @@
+_base_: [litegtr.yaml]
+
+# LiteGTR-S (1.21 M parameters, 10.03 GFLOPs at 640): the same method, only the local path
+# is narrower -- backbone widths x0.75 and a 48-channel pyramid.
+model:
+  backbone:
+    channels: [48, 96, 144, 192]
+    drop_path_rate: 0.05
+  neck:
+    channels: 48

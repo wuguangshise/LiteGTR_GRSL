@@ -1,0 +1,38 @@
+_base_: [_base_/default_runtime.yaml, _base_/schedule.yaml, _base_/visdrone.yaml]
+
+# Ultralytics YOLO26n-P2 (yolo26n-p2.yaml, ultralytics==8.4.171) + LiteGTR. The YOLO network,
+# assigner and loss are Ultralytics' own; LiteGTR's modules sit between the neck and Detect,
+# laid out as in LiteGTR: tokens from P3-P5, writeback into P2-P5, detail injected into P2.
+# The neck is wider than 64 on P4/P5, so tokens enter through a 1x1 to 64 channels and the
+# writeback projects back.
+model:
+  type: yolo_transfer
+  num_classes: 10           # set from the dataset at runtime
+  yolo:
+    cfg: yolo26n-p2.yaml
+  token:
+    dim: 64
+    levels: [P3, P4, P5]
+    writeback_levels: [P2, P3, P4, P5]
+    budget: {P3: 32, P4: 16, P5: 8}
+    grids:  {P3: 4,  P4: 4,  P5: 2}
+    num_heads: 1
+    mlp_ratio: 2.0
+    mixer_layers: 1
+    routing_sup:
+      weight: 0.5
+      sigma_ratio: 0.1667
+      sigma_min: 0.5
+    scorer_no_decay: true
+    ema:
+      momentum: 0.999
+      warmup_iters: 1000
+      photometric:
+        brightness: 0.4
+        contrast: 0.4
+        gamma: [0.7, 1.5]
+        noise: 0.03
+  detail_inject:
+    source: P3
+    target: P2
+    dilate: 3

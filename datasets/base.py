@@ -1,0 +1,102 @@
+"""Shared detection-dataset machinery (mosaic, collate, tensor conversion)."""
+from __future__ import annotations
+
+import random
+from pathlib import Path
+
+import cv2
+import numpy as np
+import torch
+from torch.utils.data import Dataset
+
+# OpenCV starts its own thread pool per process. Inside N DataLoader workers that
+# is N x (all cores) threads fighting for the CPU, which slows decoding and
+# augmentation instead of speeding it up. The DataLoader already parallelises
+# across samples, so OpenCV runs single-threaded in each worker -- the same
+# setting the YOLO codebases use. Module level, so every spawned worker (Windows)
+# applies it when it re-imports this file. No effect on the pixels produced.
+cv2.setNumThreads(0)
+cv2.ocl.setUseOpenCL(False)
+
+from datasets.transforms import (LetterBox, build_train_transforms, build_val_transforms,
+                                 mosaic4, random_scale)
+
+
+class DetectionDataset(Dataset):
+    """Subclasses implement ``load_raw(index) -> (img, boxes_xyxy, labels, meta)``."""
+
+    classes: list[str] = []
+    min_box_side: float = 1.0
+
+    def __init__(self, img_size: int = 640, train: bool = True, mosaic_prob: float = 0.5,
+                 scale_aug: float = 0.0):
+        self.img_size = img_size
+        self.train = train
+        self.mosaic_prob = mosaic_prob if train else 0.0
+        # scale jitter U(1 - scale_aug, 1 + scale_aug) after mosaic / letterbox; 0 = off.
+        # Stays on when mosaic is closed for the final epochs, as in YOLO.
+        self.scale_aug = scale_aug if train else 0.0
+        self.tf = build_train_transforms(img_size) if train else build_val_transforms(img_size)
+        # mosaic already emits an img_size canvas, so the letterbox step is skipped
+        # for that branch -- everything else in the chain still applies.
+        self.post_mosaic = [t for t in self.tf.transforms if not isinstance(t, LetterBox)]
+
+    # --- to be provided by subclasses -------------------------------------
+    def load_raw(self, index: int):
+        raise NotImplementedError
+
+    def __len__(self) -> int:
+        raise NotImplementedError
+
+    # ----------------------------------------------------------------------
+    def __getitem__(self, index: int):
+        if self.mosaic_prob > 0 and random.random() < self.mosaic_prob:
+            idxs = [index] + [random.randrange(len(self)) for _ in range(3)]
+            samples = []
+            for i in idxs:
+                img, boxes, labels, m = self.load_raw(i)
+                samples.append((img, boxes, labels))
+                if i == index:
+                    meta = m
+            img, boxes, labels = mosaic4(samples, self.img_size)
+            for t in self.post_mosaic:
+                img, boxes = t(img, boxes)
+        else:
+            img, boxes, labels, meta = self.load_raw(index)
+            if not self.train:
+                # evaluation scores against the ORIGINAL annotations, in original
+                # pixels -- see engine/evaluator.py
+                meta = dict(meta or {}, ori_boxes=np.asarray(boxes, np.float32).reshape(-1, 4),
+                            ori_labels=np.asarray(labels, np.int64).reshape(-1))
+            n_before = len(boxes)
+            img, boxes = self.tf(img, boxes)
+            if n_before and len(boxes):
+                keep = ((boxes[:, 2] - boxes[:, 0] > self.min_box_side)
+                        & (boxes[:, 3] - boxes[:, 1] > self.min_box_side))
+                boxes, labels = boxes[keep], labels[keep]
+
+        if self.scale_aug > 0:
+            img, boxes, keep = random_scale(img, boxes, self.scale_aug)
+            labels = np.asarray(labels).reshape(-1)[keep]
+
+        img = np.ascontiguousarray(img[:, :, ::-1].transpose(2, 0, 1))  # BGR->RGB, HWC->CHW
+        tensor = torch.from_numpy(img).float().div_(255.0)
+        target = {
+            "boxes": torch.from_numpy(np.asarray(boxes, dtype=np.float32)).reshape(-1, 4),
+            "labels": torch.from_numpy(np.asarray(labels, dtype=np.int64)).reshape(-1),
+            "meta": meta or {},
+        }
+        return tensor, target
+
+
+def collate_fn(batch):
+    imgs = torch.stack([b[0] for b in batch])
+    targets = [b[1] for b in batch]
+    return imgs, targets
+
+
+def imread(path: str | Path) -> np.ndarray:
+    img = cv2.imread(str(path))
+    if img is None:
+        raise FileNotFoundError(f"failed to read image: {path}")
+    return img

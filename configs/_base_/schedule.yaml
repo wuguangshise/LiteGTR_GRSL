@@ -1,0 +1,55 @@
+# Training recipe shared by every model (LiteGTR, LiteGTR-S, YOLO26n-P2 + LiteGTR).
+train:
+  epochs: 300               # from scratch
+  batch_size: 8
+  val_batch_size: 16
+  optimizer: adamw
+  lr: 0.001
+  weight_decay: 0.05
+  warmup_epochs: 3          # linear warmup
+  scheduler: flat_cosine    # hold the peak LR for flat_epochs, then cosine decay
+  flat_epochs: 150
+  final_lr_ratio: 0.05      # decay floor, relative to lr
+  amp: true
+  grad_clip: 10.0
+  val_interval: 5
+  val_dense_last: 30        # validate every epoch over the final 30 epochs
+  save_period: 0            # >0 also writes epoch_xx.pt
+  monitor: mAP50_95
+  model_ema:                # weight EMA, evaluated instead of the raw weights
+    enabled: true
+    decay: 0.9999
+    tau: 2000
+
+loss:
+  qfl_weight: 1.0
+  iou_weight: 2.0           # GIoU
+  dfl_weight: 0.25
+  token_weight: 0.5         # EMA consistency of the routing map
+  token_temperature: 1.0
+  token_hard_ratio: 1.0
+
+# Post-processing for evaluation: score 0.001, class-wise NMS at IoU 0.7, multi-label,
+# up to 300 boxes per image (the metric scores the top 100).
+test:
+  score_thr: 0.001
+  nms_iou: 0.7
+  max_det: 300
+  multi_label: true
+  agnostic: false
+  containment: null
+
+# Drawing only (tools/demo.py, example predictions); never touches a metric.
+vis:
+  score_thr: 0.3
+  nms_iou: 0.6
+  agnostic: true            # one box per object, whatever the class
+  containment: 0.8          # drop a box >= 80% inside a higher-scoring one
+  label: class              # none | class | class_score
+  show_gt: false
+
+assigner:
+  topk: 13
+  alpha: 1.0
+  beta: 6.0
+  stal_size: 8              # GT sides shorter than 8 px are widened for candidate selection

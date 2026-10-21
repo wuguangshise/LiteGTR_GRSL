@@ -1,0 +1,11 @@
+data:
+  name: visdrone
+  root: data/VisDrone       # or pass --data-root
+  train_split: VisDrone2019-DET-train
+  val_split: VisDrone2019-DET-val
+  test_split: VisDrone2019-DET-test-dev
+  img_size: 640
+  mosaic_prob: 1.0
+  scale_aug: 0.5            # zoom U(0.5, 1.5) after mosaic
+  ignore_mode: mask         # training: ignored regions painted out, class 11 dropped
+  eval_ignore_mode: drop    # evaluation: image untouched, class 0 / 11 annotations dropped

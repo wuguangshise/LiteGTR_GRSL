@@ -1,0 +1,50 @@
+_base_: [_base_/default_runtime.yaml, _base_/schedule.yaml, _base_/visdrone.yaml]
+
+# LiteGTR (2.13 M parameters, 17.29 GFLOPs at 640).
+# Local path: RepViT backbone, weighted top-down fusion into P2-P5, GFL head.
+# Global path: 56 region-anchor tokens from P3-P5, one self-attention layer over them,
+# geometry-aware writeback into every position of P2-P5 (P2 receives, never provides).
+# The routing map of the region anchors gates the stride-2 detail injection into P2.
+model:
+  num_classes: 10           # set from the dataset at runtime
+
+  backbone:
+    type: repvit
+    channels: [64, 128, 192, 256]
+    depths: [4, 4, 2, 1]
+    drop_path_rate: 0.1
+
+  neck:
+    channels: 64
+    weighted_fusion: [P2, P3, P4]   # (w1 * lat(C_l) + w2 * up(P_l+1)) / (w1 + w2), per channel
+
+  token:
+    levels: [P3, P4, P5]                # participants
+    writeback_levels: [P2, P3, P4, P5]  # receivers
+    budget: {P3: 32, P4: 16, P5: 8}     # N = 56
+    grids:  {P3: 4,  P4: 4,  P5: 2}     # budget / grid^2 evenly spaced points per region
+    num_heads: 1
+    mlp_ratio: 2.0
+    mixer_layers: 1
+    routing_sup:                        # GT-centre supervision of the routing map
+      weight: 0.5
+      sigma_ratio: 0.1667               # Gaussian sigma = 1/6 of the box extent...
+      sigma_min: 0.5                    # ...at least half a cell
+    scorer_no_decay: true
+    ema:                                # EMA teacher on a photometric view (training only)
+      momentum: 0.999
+      warmup_iters: 1000
+      photometric:
+        brightness: 0.4
+        contrast: 0.4
+        gamma: [0.7, 1.5]
+        noise: 0.03
+
+  detail_inject:                        # P2 += gamma * M * Conv1x1(SpaceToDepth(stem_s2))
+    source: P3                          # M = dilated sigmoid of the P3 routing map
+    dilate: 3
+
+  head:
+    stacked_convs: 2
+    p2_stacked_convs: 1
+    reg_max: 16
